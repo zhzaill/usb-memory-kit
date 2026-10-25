@@ -1,0 +1,7 @@
+{
+  "_comment": "organize-files.py 的配置。root 留空时使用 U 盘根目录下的 我的文件；categories 可自由增删。",
+  "root": "",
+  "categories": ["文档", "表格", "图片", "视频", "音频", "安装包", "压缩包", "代码", "临时", "其他"],
+  "endpoint": "http://127.0.0.1:18080",
+  "max_files": 200
+}

@@ -1,0 +1,39 @@
+# Generated memory data
+memory-kit/corpus/*
+!memory-kit/corpus/.gitkeep
+memory-kit/index/*
+!memory-kit/index/.gitkeep
+memory-kit/runtime/*
+!memory-kit/runtime/.gitkeep
+memory-kit/state/*
+!memory-kit/state/.gitkeep
+
+# Secrets and machine-specific config
+memory-kit/config/secret.ps1
+memory-kit/mcp/*.resolved.json
+
+# Local AI binaries and models
+local-ai/models/*
+!local-ai/models/.gitkeep
+local-ai/llama/*
+!local-ai/llama/.gitkeep
+local-ai/llama-cpu/*
+!local-ai/llama-cpu/.gitkeep
+local-ai/_dl/*
+!local-ai/_dl/.gitkeep
+local-ai/state/*
+!local-ai/state/.gitkeep
+
+# User files
+我的文件/*
+!我的文件/README.md
+
+# Python and editor noise
+__pycache__/
+*.py[cod]
+.venv/
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
+*.log

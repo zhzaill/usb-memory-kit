@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "embed": {
+    "dim": 1024,
+    "batch": 32,
+    "endpoints": [
+      {
+        "url": "http://127.0.0.1:18082/v1/embeddings",
+        "health": "http://127.0.0.1:18082/health",
+        "model": "qwen3-embedding",
+        "note": "on-stick llama.cpp (Qwen3-Embedding-0.6B Q8, Vulkan/CPU) - offline capable, local-ai/start-local-ai.ps1"
+      },
+      {
+        "url": "http://127.0.0.1:18081/v1/embeddings",
+        "health": "http://127.0.0.1:18081/health",
+        "model": "qwen3-embedding",
+        "note": "optional SSH tunnel -> remote GPU embedding endpoint"
+      }
+    ]
+  },
+  "tunnel": {
+    "plink": "C:\\Program Files\\PuTTY\\plink.exe",
+    "hostkey": "SHA256:REPLACE_WITH_REMOTE_HOST_KEY",
+    "user": "user@example-host",
+    "remote_host": "127.0.0.1",
+    "remote_port": 18081,
+    "local_port": 18081
+  },
+  "chunk": {
+    "aggregate_chars": 700,
+    "window_chars": 1200,
+    "overlap_chars": 120,
+    "min_chars": 20,
+    "extensions": [".md", ".log", ".csv", ".txt"]
+  },
+  "exclude_names": ["AGENTS.md", "RULES.md"],
+  "organize": {
+    "k": 8,
+    "threshold": 0.55,
+    "resolution": 1.0,
+    "seed": 42
+  },
+  "search": {
+    "rrf_k": 60,
+    "default_k": 10,
+    "port": 18200
+  },
+  "memory": {
+    "state_dir": "state",
+    "sessions": {
+      "max_turns": 40,
+      "ttl_days": 30
+    },
+    "context": {
+      "ttl_seconds": 900,
+      "max_items": 256,
+      "max_chars": 6000,
+      "hard_max_chars": 30000
+    }
+  }
+}

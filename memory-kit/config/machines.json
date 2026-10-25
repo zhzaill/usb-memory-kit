@@ -1,0 +1,12 @@
+{
+  "_说明": "每台电脑的日志根路径注册表。键 = COMPUTERNAME。roots 递归扫描目录；files 用于登记大项目目录中的单个日志。首次运行 pipeline.ps1 会自动发现并写入本机条目。",
+  "_example": {
+    "roots": [
+      "C:\\Users\\example\\Logs"
+    ],
+    "files": [
+      "C:\\Projects\\example\\2026-01-01-example.md"
+    ],
+    "note": "copy this shape under the actual hostname"
+  }
+}

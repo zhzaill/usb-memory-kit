@@ -1,0 +1,9 @@
+{
+  "_说明": "示例 MCP 配置。start.ps1 会按当前盘符生成 memory-kit.resolved.json，优先使用那份。",
+  "mcpServers": {
+    "memory-kit": {
+      "command": "<USB_ROOT>\\memory-kit\\runtime\\venv\\Scripts\\python.exe",
+      "args": ["<USB_ROOT>\\memory-kit\\bin\\mcp_server.py"]
+    }
+  }
+}

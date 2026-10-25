@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>memory-kit</title>
+<style>
+:root{
+  --canvas:#fff;--subtle:#f6f8fa;--border:#d1d9e0;--fg:#1f2328;
+  --muted:#59636e;--faint:#6e7781;--accent:#0969da;--accent-soft:#ddf4ff;
+  --warn:#9a6700;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:var(--canvas);color:var(--fg);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans","Microsoft YaHei",sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+[hidden]{display:none!important}
+.mono{font-family:var(--mono)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mode-switch{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--subtle);flex:none}
+.mode-switch button{min-width:92px;min-height:32px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--muted);padding:5px 12px}
+.mode-switch button:last-child{border-right:0}
+.mode-switch button[aria-pressed="true"]{background:var(--canvas);color:var(--fg);font-weight:600}
+.mode-switch button:hover{color:var(--accent)}
+
+/* search */
+#searchRoot{min-height:100vh}
+.landing{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px}
+.landing-top{position:fixed;top:14px;right:18px;display:flex;gap:10px;align-items:center;z-index:3}
+.brand{font-size:36px;font-weight:600;margin:0 0 6px}
+.brand i{font-style:normal;color:var(--accent)}
+.tagline{color:var(--muted);margin-bottom:28px}
+.searchbar{display:flex;width:min(620px,92vw);border:1px solid var(--border);border-radius:6px;background:var(--canvas)}
+.searchbar:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.searchbar input{flex:1;border:0;outline:0;padding:11px 12px;font-size:15px;background:transparent;color:var(--fg);min-width:0}
+.searchbar .icon{display:flex;align-items:center;padding-left:12px;color:var(--muted)}
+.searchbar button{border:0;background:transparent;display:flex;align-items:center;padding:0 13px;color:var(--muted);border-left:1px solid transparent}
+.searchbar button:hover{background:var(--subtle);color:var(--accent)}
+.chips{margin-top:26px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:780px}
+.chip{border:1px solid var(--border);border-radius:999px;background:var(--subtle);color:var(--muted);padding:4px 11px;font-size:12px}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.landing-note{margin-top:24px;color:var(--faint);font-size:12px}
+
+#searchApp{display:none;min-height:100vh;flex-direction:column}
+.search-header{position:sticky;top:0;z-index:3;background:var(--canvas);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:14px}
+.brand-sm{font-size:18px;font-weight:600;white-space:nowrap;color:var(--fg)}
+.brand-sm i{font-style:normal;color:var(--accent)}
+.search-header .searchbar{flex:1;max-width:680px}
+.search-header select{border:1px solid var(--border);border-radius:6px;background:var(--subtle);color:var(--fg);padding:7px 9px}
+.search-main{display:flex;gap:24px;padding:16px 20px;flex:1;max-width:1200px;margin:0 auto;width:100%}
+.search-rail{width:224px;flex:none}
+.search-rail h3{font-size:12px;font-weight:600;color:var(--muted);margin:4px 0 8px;text-transform:uppercase}
+.community{display:block;width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:4px 8px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.community:hover{background:var(--accent-soft);color:var(--accent)}
+.search-results{flex:1;min-width:0}
+.search-meta{color:var(--muted);font-size:12px;padding:2px 0 12px;border-bottom:1px solid var(--border);font-family:var(--mono)}
+.result{padding:14px 0;border-bottom:1px solid var(--border)}
+.result h2{margin:0;font-size:16px;font-weight:600}
+.result-meta{font-size:12px;color:var(--faint);margin:2px 0 6px;font-family:var(--mono);overflow-wrap:anywhere}
+.result-preview{color:var(--muted)}
+.result-full{background:var(--subtle);border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:9px 12px}
+.result-full .fh{font-family:var(--mono);font-size:12px;color:var(--faint)}
+.result-full pre{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:4px 0 0;color:var(--fg)}
+.search-warning{color:var(--warn);background:var(--subtle);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+.search-footer{border-top:1px solid var(--border);background:var(--subtle);padding:5px 20px;color:var(--faint);font-size:12px;font-family:var(--mono)}
+.search-footer span+span{margin-left:16px}
+
+/* HALOFLUX-inspired raw log workspace */
+#archiveRoot{display:none;position:fixed;inset:0;background:#020203;color:#f5f5f7;font-family:var(--mono);overflow:hidden}
+body.archive-open #searchRoot{display:none}
+body.archive-open #archiveRoot{display:flex;flex-direction:column}
+#fluxRoot{display:none;position:fixed;inset:0;background:#050506;z-index:4}
+body.flux-open #searchRoot{display:none}
+body.flux-open #fluxRoot{display:block}
+#fluxFrame{width:100%;height:100%;border:0;display:block;background:#050506}
+#flux{position:absolute;inset:0;width:100%;height:100%;opacity:.34;pointer-events:none}
+.archive-shade{position:absolute;inset:0;background:rgba(0,0,0,.2);pointer-events:none}
+.archive-header{position:relative;z-index:2;min-height:58px;display:flex;align-items:center;gap:16px;padding:9px 18px;border-bottom:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.76);backdrop-filter:blur(8px)}
+.archive-brand{font-size:18px;font-weight:700;white-space:nowrap}
+.archive-brand b{color:#ff3d9a;font-weight:700}
+.archive-brand small{font-size:10px;color:#909098;margin-left:8px}
+#archiveRoot .mode-switch{background:#08080a;border-color:rgba(255,255,255,.24)}
+#archiveRoot .mode-switch button{color:#a8a8ae;border-color:rgba(255,255,255,.2)}
+#archiveRoot .mode-switch button[aria-pressed="true"]{background:#f5f5f7;color:#050506}
+.archive-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.archive-button{min-height:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.28);background:#09090b;color:#f5f5f7;padding:5px 11px;text-decoration:none;font-size:12px}
+.archive-button:hover{background:#f5f5f7;color:#050506;text-decoration:none}
+.archive-button.accent{border-color:#ff3d9a;color:#ff8dc0}
+.archive-button.accent:hover{background:#ff3d9a;color:#050506}
+.archive-button[disabled]{opacity:.5;cursor:wait}
+.archive-workspace{position:relative;z-index:1;flex:1;min-height:0;display:grid;grid-template-columns:minmax(320px,38%) 1fr;background:rgba(0,0,0,.55)}
+.logs-pane{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.78)}
+.logs-tools{padding:12px;border-bottom:1px solid rgba(255,255,255,.16)}
+.logs-search{display:flex;border:1px solid rgba(255,255,255,.28);background:#050506}
+.logs-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#fff;padding:9px 10px;font-size:12px}
+.logs-search span{display:flex;align-items:center;padding:0 10px;color:#ff8dc0}
+.logs-status{display:flex;justify-content:space-between;gap:12px;padding-top:8px;color:#8d8d95;font-size:10px}
+.logs-list{flex:1;min-height:0;overflow:auto;scrollbar-color:#555 #050506}
+.log-item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid rgba(255,255,255,.12);background:transparent;color:#efeff2;padding:10px 12px}
+.log-item:hover{background:rgba(255,61,154,.1)}
+.log-item[aria-current="true"]{background:rgba(255,61,154,.17);box-shadow:inset 2px 0 0 #ff3d9a}
+.log-item-title{display:block;font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-item-meta{display:flex;gap:8px;color:#95959c;font-size:10px;margin-top:3px}
+.log-item-excerpt{display:block;color:#aeadb4;font-size:10px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-pane{min-width:0;min-height:0;display:flex;flex-direction:column;background:rgba(0,0,0,.7)}
+.log-empty{flex:1;display:grid;place-items:center;color:#77777f;font-size:12px;text-transform:uppercase}
+.log-viewer{flex:1;min-height:0;display:flex;flex-direction:column}
+.log-detail-head{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.18);display:flex;gap:12px;align-items:flex-start}
+.log-detail-title{flex:1;min-width:0}
+.log-detail-title h1{margin:0;font-size:16px;line-height:1.35;font-weight:600;overflow-wrap:anywhere}
+.log-detail-meta{color:#9c9ca3;font-size:10px;margin-top:4px;overflow-wrap:anywhere}
+.log-detail-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.log-doc{flex:1;min-height:0;overflow:auto;padding:18px 22px 80px;background:rgba(0,0,0,.62);color:#dddddf}
+.log-doc pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 var(--mono)}
+.archive-footer{position:relative;z-index:2;min-height:27px;display:flex;gap:16px;align-items:center;padding:4px 18px;border-top:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.82);color:#8c8c93;font-size:10px}
+.archive-footer span:last-child{margin-left:auto}
+.archive-toast{position:fixed;right:18px;bottom:42px;z-index:5;max-width:min(460px,80vw);border:1px solid rgba(255,255,255,.28);background:#09090b;color:#f5f5f7;padding:9px 12px;font:11px/1.5 var(--mono);white-space:pre-wrap}
+
+@media(max-width:900px){
+  .search-rail{display:none}
+  .landing-top{top:10px;right:10px}
+  .archive-header{align-items:flex-start;flex-wrap:wrap}
+  .archive-actions{width:100%;margin-left:0;overflow:auto;padding-bottom:1px}
+  .archive-workspace{grid-template-columns:1fr;grid-template-rows:minmax(220px,42vh) 1fr}
+  .logs-pane{border-right:0;border-bottom:1px solid rgba(255,255,255,.22)}
+  .log-detail-head{flex-direction:column}
+  .log-detail-actions{justify-content:flex-start}
+  .search-header{flex-wrap:wrap}
+  .search-header .searchbar{order:4;width:100%;max-width:none}
+}
+@media(max-width:600px){
+  .search-header{gap:8px;padding:8px 10px}
+  .search-header .brand-sm{order:1;flex:1;font-size:16px}
+  .search-header select{order:2}
+  .search-header .mode-switch{order:3;width:100%;display:flex}
+  .search-header .mode-switch button{flex:1;min-width:0}
+  .archive-header{gap:8px;padding:8px 10px}
+  .archive-brand{width:100%;font-size:16px}
+  .archive-brand small{display:none}
+  .archive-header .mode-switch{width:100%;display:flex}
+  .archive-header .mode-switch button{flex:1;min-width:0}
+  .archive-actions{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .archive-actions .archive-button{width:100%;padding-left:6px;padding-right:6px}
+}
+@media(prefers-reduced-motion:reduce){
+  #flux{opacity:.22}
+}
+</style>
+</head>
+<body>
+<div id="searchRoot">
+  <section id="landing" class="landing">
+    <div class="landing-top">
+      <nav class="mode-switch" aria-label="视图">
+        <button type="button" data-mode-view="search" aria-pressed="true">智能检索</button>
+        <button type="button" data-mode-view="archive" aria-pressed="false">原始日志</button>
+        <button type="button" data-mode-view="flux" aria-pressed="false">光场</button>
+      </nav>
+    </div>
+    <h1 class="brand">memory<i>·</i>kit</h1>
+    <div class="tagline" id="tagline">随身日志记忆库</div>
+    <form class="searchbar" id="landingForm">
+      <span class="icon" aria-hidden="true">⌕</span>
+      <input id="landingQuery" type="text" placeholder="搜索全部日志记忆…" aria-label="搜索记忆库" autofocus>
+      <button type="submit" aria-label="搜索">检索</button>
+    </form>
+    <div class="chips" id="topicChips"></div>
+    <div class="landing-note">hybrid · semantic + keyword</div>
+  </section>
+
+  <div id="searchApp">
+    <header class="search-header">
+      <a class="brand-sm" id="searchHome" href="?view=search" title="返回首页">memory<i>·</i>kit</a>
+      <nav class="mode-switch" aria-label="视图">
+        <button type="button" data-mode-view="search" aria-pressed="true">智能检索</button>
+        <button type="button" data-mode-view="archive" aria-pressed="false">原始日志</button>
+        <button type="button" data-mode-view="flux" aria-pressed="false">光场</button>
+      </nav>
+      <form class="searchbar" id="searchForm">
+        <span class="icon" aria-hidden="true">⌕</span>
+        <input id="searchQuery" type="text" aria-label="搜索记忆库">
+        <button type="submit" aria-label="搜索">检索</button>
+      </form>
+      <select id="searchMode" aria-label="检索模式">
+        <option value="hybrid">hybrid</option>
+        <option value="dense">dense</option>
+        <option value="sparse">sparse</option>
+      </select>
+    </header>
+    <main class="search-main">
+      <nav class="search-rail" aria-label="社区导航">
+        <h3>社区</h3>
+        <div id="communityList"></div>
+      </nav>
+      <section class="search-results">
+        <div class="search-meta" id="resultMeta"></div>
+        <div id="resultList"></div>
+      </section>
+    </main>
+    <footer class="search-footer" id="searchFooter"></footer>
+  </div>
+</div>
+
+<section id="archiveRoot" aria-label="原始日志工作台">
+  <canvas id="flux" aria-hidden="true"></canvas>
+  <div class="archive-shade" aria-hidden="true"></div>
+  <header class="archive-header">
+    <div class="archive-brand">MEMORY<b>//</b>ARCHIVE <small>HALOFLUX MODE</small></div>
+    <nav class="mode-switch" aria-label="视图">
+      <button type="button" data-mode-view="search" aria-pressed="false">智能检索</button>
+      <button type="button" data-mode-view="archive" aria-pressed="true">原始日志</button>
+      <button type="button" data-mode-view="flux" aria-pressed="false">光场</button>
+    </nav>
+    <div class="archive-actions">
+      <button class="archive-button accent" id="syncLogs" type="button">同步日志</button>
+      <a class="archive-button" href="/api/logs.zip">下载全部</a>
+      <button class="archive-button" id="copyArchivePath" type="button">复制路径</button>
+    </div>
+  </header>
+  <main class="archive-workspace">
+    <aside class="logs-pane">
+      <div class="logs-tools">
+        <label class="logs-search">
+          <input id="logFilter" type="search" placeholder="过滤文件名或正文…" aria-label="过滤原始日志">
+          <span aria-hidden="true">FILTER</span>
+        </label>
+        <div class="logs-status">
+          <span id="logStats">RAW FILES</span>
+          <span id="syncStatus"></span>
+        </div>
+      </div>
+      <div class="logs-list" id="logList" role="list"></div>
+    </aside>
+    <article class="log-pane">
+      <div class="log-empty" id="logEmpty">NO LOG SELECTED</div>
+      <div class="log-viewer" id="logViewer" hidden>
+        <header class="log-detail-head">
+          <div class="log-detail-title">
+            <h1 id="logTitle"></h1>
+            <div class="log-detail-meta" id="logMeta"></div>
+          </div>
+          <div class="log-detail-actions">
+            <button class="archive-button" id="copyLogText" type="button">复制全文</button>
+            <a class="archive-button" id="downloadLog" href="#">下载原文件</a>
+            <button class="archive-button" id="searchThisLog" type="button">回到检索</button>
+          </div>
+        </header>
+        <div class="log-doc"><pre id="logText"></pre></div>
+      </div>
+    </article>
+  </main>
+  <footer class="archive-footer">
+    <span id="archiveRootLabel">ARCHIVE</span>
+    <span id="archiveBytes">0 B</span>
+    <span>RAW SOURCE / NO CHUNK LOSS</span>
+  </footer>
+  <div class="archive-toast" id="archiveToast" hidden></div>
+</section>
+
+<section id="fluxRoot" aria-label="MEMORY HALOFLUX 光场">
+  <iframe id="fluxFrame" title="MEMORY HALOFLUX" data-src="/haloflux" loading="lazy"></iframe>
+</section>
+
+<script>
+const state={
+  view:'search',
+  searchQuery:'',
+  searchMode:'hybrid',
+  logQuery:'',
+  selectedLog:'',
+  logText:'',
+  logs:[],
+  logStats:null,
+  clusters:[],
+  health:null
+};
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtBytes=n=>{
+  if(n<1024)return n+' B';
+  if(n<1024*1024)return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(1)+' MB';
+};
+const nowUrl=()=>new URL(location.href);
+function updateUrl(push){
+  const u=nowUrl();
+  u.searchParams.set('view',state.view);
+  if(state.searchQuery)u.searchParams.set('q',state.searchQuery);else u.searchParams.delete('q');
+  if(state.searchMode&&state.searchMode!=='hybrid')u.searchParams.set('mode',state.searchMode);else u.searchParams.delete('mode');
+  if(state.logQuery)u.searchParams.set('logs_q',state.logQuery);else u.searchParams.delete('logs_q');
+  if(state.selectedLog)u.searchParams.set('log',state.selectedLog);else u.searchParams.delete('log');
+  history[push?'pushState':'replaceState']({},'',u);
+}
+function syncButtons(){
+  document.querySelectorAll('[data-mode-view]').forEach(btn=>{
+    btn.setAttribute('aria-pressed',String(btn.dataset.modeView===state.view));
+  });
+}
+function showView(view){
+  state.view=view;
+  document.body.classList.toggle('archive-open',view==='archive');
+  document.body.classList.toggle('flux-open',view==='flux');
+  syncButtons();
+  if(view==='archive'){
+    resizeFlux();
+    startFlux();
+  }else if(view==='flux'){
+    const frame=$('fluxFrame');
+    if(!frame.getAttribute('src'))frame.setAttribute('src',frame.dataset.src);
+  }
+}
+function switchView(view,push=true){
+  showView(view);
+  updateUrl(push);
+  if(view==='archive'){
+    loadLogs().then(()=>{if(state.selectedLog)loadLogDetail(state.selectedLog);});
+  }
+}
+
+async function loadOverview(){
+  const [health,clusterData]=await Promise.all([
+    fetch('/api/health').then(r=>r.json()),
+    fetch('/api/clusters').then(r=>r.json())
+  ]);
+  state.health=health;
+  state.clusters=clusterData.clusters||[];
+  $('tagline').textContent=`随身日志记忆库 · ${health.chunks} 块 · ${health.vectors} 向量 · ${state.clusters.length} 社区`;
+  const chips=$('topicChips');
+  chips.innerHTML='';
+  state.clusters.slice(0,12).forEach(cluster=>{
+    const button=document.createElement('button');
+    button.type='button';button.className='chip';
+    button.textContent=`#${cluster.id} ${cluster.topics[0]||''} (${cluster.size})`;
+    button.title=(cluster.topics||[]).join(' / ');
+    button.onclick=()=>{ $('landingQuery').value=cluster.topics[0]||''; runLandingSearch(); };
+    chips.appendChild(button);
+  });
+  const list=$('communityList');list.innerHTML='';
+  state.clusters.slice(0,30).forEach(cluster=>{
+    const button=document.createElement('button');
+    button.type='button';button.className='community';
+    button.textContent=`#${cluster.id} · ${cluster.size} · ${cluster.topics[0]||''}`;
+    button.title=(cluster.topics||[]).join(' / ');
+    button.onclick=()=>{
+      state.searchQuery=cluster.topics[0]||'';
+      $('searchQuery').value=state.searchQuery;
+      searchMemory(true);
+    };
+    list.appendChild(button);
+  });
+  $('searchFooter').innerHTML=`<span>${esc(health.embed_endpoint||'no endpoint')}</span><span>kit ${esc(health.kit_root)}</span>`;
+}
+
+function showSearchApp(show){
+  $('landing').hidden=show;
+  $('searchApp').style.display=show?'flex':'none';
+}
+function runLandingSearch(){
+  const q=$('landingQuery').value.trim();
+  if(!q)return;
+  state.searchQuery=q;
+  $('searchQuery').value=q;
+  showSearchApp(true);
+  searchMemory(true);
+}
+async function searchMemory(push){
+  const q=$('searchQuery').value.trim();
+  if(!q)return;
+  state.searchQuery=q;
+  state.searchMode=$('searchMode').value;
+  showSearchApp(true);
+  if(push)updateUrl(true);
+  const started=performance.now();
+  const response=await fetch('/api/search?q='+encodeURIComponent(q)+'&mode='+encodeURIComponent(state.searchMode)+'&k=10');
+  const data=await response.json();
+  const elapsed=(performance.now()-started).toFixed(0);
+  $('resultMeta').textContent=`${data.results.length?data.results.length+' 条结果':'无结果'} · ${elapsed} ms · mode=${state.searchMode}${data.degraded?' · sparse fallback':' · endpoint ok'}`;
+  const warning=data.degraded?'<div class="search-warning" role="alert">embedding 端点不可用，本次为纯关键词检索</div>':'';
+  $('resultList').innerHTML=warning+data.results.map(item=>
+    `<article class="result">
+      <h2><a href="#" class="chunk-link" data-id="${esc(item.id)}">${esc(item.topic)}</a></h2>
+      <div class="result-meta">${esc(item.date||'undated')} · ${esc((item.machines||[]).join(','))} · cluster#${esc(item.cluster)} · ${(item.score_norm*100).toFixed(1)}% · ${esc(item.source)}</div>
+      <div class="result-preview">${esc(item.preview)}…</div>
+    </article>`).join('');
+}
+$('resultList').addEventListener('click',async event=>{
+  const link=event.target.closest('a.chunk-link');
+  if(!link)return;
+  event.preventDefault();
+  const id=link.dataset.id;
+  const old=document.getElementById('full-'+id);
+  if(old){old.remove();return;}
+  const data=await fetch('/api/chunk?id='+encodeURIComponent(id)).then(r=>r.json());
+  if(data.error)return;
+  const div=document.createElement('div');div.className='result-full';div.id='full-'+id;
+  div.innerHTML=`<div class="fh">${esc((data.headings||[]).join(' > '))}</div><pre></pre>`;
+  div.querySelector('pre').textContent=data.text;
+  link.closest('.result').appendChild(div);
+});
+
+function renderLogs(){
+  const list=$('logList');list.innerHTML='';
+  if(!state.logs.length){
+    list.innerHTML='<div class="log-item"><span class="log-item-title">NO MATCH</span></div>';
+    return;
+  }
+  state.logs.forEach(item=>{
+    const button=document.createElement('button');
+    button.type='button';button.className='log-item';button.setAttribute('role','listitem');
+    if(item.id===state.selectedLog)button.setAttribute('aria-current','true');
+    button.innerHTML=`<span class="log-item-title">${esc(item.topic)}</span>
+      <span class="log-item-meta"><span>${esc(item.date||'undated')}</span><span>${esc(item.ext)}</span><span>${fmtBytes(item.bytes)}</span></span>
+      ${item.excerpt?`<span class="log-item-excerpt">${esc(item.excerpt)}</span>`:''}`;
+    button.onclick=()=>selectLog(item.id,true);
+    list.appendChild(button);
+  });
+}
+async function loadLogs(){
+  const data=await fetch('/api/logs?q='+encodeURIComponent(state.logQuery)+'&limit=1000').then(r=>r.json());
+  state.logs=data.files||[];
+  state.logStats=data.stats||{};
+  $('logStats').textContent=`${state.logStats.files||0} FILES · ${fmtBytes(state.logStats.bytes||0)}`;
+  $('archiveRootLabel').textContent=state.logStats.archive_root||'ARCHIVE';
+  $('archiveBytes').textContent=fmtBytes(state.logStats.bytes||0);
+  renderLogs();
+}
+async function selectLog(id,push){
+  state.selectedLog=id;
+  renderLogs();
+  if(push)updateUrl(true);
+  await loadLogDetail(id);
+}
+async function loadLogDetail(id){
+  $('logEmpty').hidden=true;
+  $('logViewer').hidden=false;
+  $('logTitle').textContent='LOADING';
+  $('logMeta').textContent=id;
+  $('logText').textContent='';
+  const data=await fetch('/api/log?id='+encodeURIComponent(id)).then(r=>r.json());
+  if(data.error){showToast(data.error);return;}
+  state.logText=data.text||'';
+  $('logTitle').textContent=data.topic||data.name;
+  $('logMeta').textContent=`${data.date||'undated'} · ${fmtBytes(data.bytes)} · ${data.id}`;
+  $('logText').textContent=state.logText;
+  $('downloadLog').href='/api/log/download?id='+encodeURIComponent(data.id);
+}
+function showToast(message,timeout=3600){
+  const toast=$('archiveToast');
+  toast.textContent=message;toast.hidden=false;
+  clearTimeout(showToast.timer);
+  showToast.timer=setTimeout(()=>toast.hidden=true,timeout);
+}
+
+async function syncRawLogs(){
+  const button=$('syncLogs');
+  button.disabled=true;$('syncStatus').textContent='SYNCING';
+  try{
+    const response=await fetch('/api/logs/sync',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:'{}'
+    });
+    const data=await response.json();
+    $('syncStatus').textContent=data.success?'SYNCED':'FAILED';
+    showToast(data.output||(data.success?'synchronized':'sync failed'),6000);
+    await loadLogs();
+  }catch(error){
+    $('syncStatus').textContent='FAILED';showToast(String(error));
+  }finally{
+    button.disabled=false;
+  }
+}
+async function copyText(text,message){
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast(message||'COPIED');
+  }catch(error){
+    showToast(String(error));
+  }
+}
+
+/* HALOFLUX-inspired line field */
+const canvas=$('flux');
+const ctx=canvas.getContext('2d');
+let fluxWidth=0,fluxHeight=0,fluxFrame=0;
+function resizeFlux(){
+  const ratio=Math.min(devicePixelRatio||1,2);
+  fluxWidth=canvas.clientWidth;fluxHeight=canvas.clientHeight;
+  canvas.width=Math.max(1,Math.floor(fluxWidth*ratio));
+  canvas.height=Math.max(1,Math.floor(fluxHeight*ratio));
+  ctx.setTransform(ratio,0,0,ratio,0,0);
+}
+function drawFlux(time,animate=true){
+  if(state.view!=='archive'){fluxFrame=0;return;}
+  const w=fluxWidth||canvas.clientWidth,h=fluxHeight||canvas.clientHeight;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='#020203';ctx.fillRect(0,0,w,h);
+  const cx=w*.32,cy=h*.52,r=Math.min(h*.62,520),phase=time*.00018;
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(-.28+Math.sin(phase)*.025);
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=1;
+  for(let i=0;i<7;i++){
+    const rr=r-i*9;
+    ctx.beginPath();ctx.ellipse(0,0,rr,rr*2.7,0,-1.32,1.32);ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(255,61,154,.48)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(0,0,r+8,(r+8)*2.7,0,-.86,.86);ctx.stroke();
+  ctx.restore();
+  const horizonY=cy;
+  for(let i=0;i<105;i++){
+    const y=((Math.sin(i*91.7)*.5+.5)*h);
+    const start=w*.48+(i%13)*6;
+    const length=w*(.08+((i*37)%100)/180);
+    const alpha=.04+((i*17)%30)/500;
+    ctx.strokeStyle=i%19===0?`rgba(255,61,154,${alpha*2.4})`:`rgba(255,255,255,${alpha})`;
+    ctx.lineWidth=i%19===0?1.6:.7;
+    ctx.beginPath();ctx.moveTo(start,y);ctx.lineTo(Math.min(w,start+length),y+(y-horizonY)*.02);ctx.stroke();
+  }
+  const sweep=(Math.sin(phase*2.2)*.5+.5)*w;
+  ctx.fillStyle='rgba(255,255,255,.055)';ctx.fillRect(sweep,0,2,h);
+  fluxFrame=animate?requestAnimationFrame(drawFlux):0;
+}
+function startFlux(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+    if(!fluxWidth||!fluxHeight)resizeFlux();
+    drawFlux(0,false);
+    return;
+  }
+  if(!fluxFrame)fluxFrame=requestAnimationFrame(drawFlux);
+}
+
+document.querySelectorAll('[data-mode-view]').forEach(button=>{
+  button.addEventListener('click',()=>switchView(button.dataset.modeView,true));
+});
+$('landingForm').addEventListener('submit',event=>{event.preventDefault();runLandingSearch();});
+$('searchForm').addEventListener('submit',event=>{event.preventDefault();searchMemory(true);});
+$('searchHome').addEventListener('click',event=>{
+  event.preventDefault();state.searchQuery='';state.selectedLog='';
+  showSearchApp(false);$('landingQuery').focus();updateUrl(true);
+});
+$('landingQuery').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();runLandingSearch();}});
+$('searchQuery').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();searchMemory(true);}});
+$('searchMode').addEventListener('change',()=>{if(state.searchQuery)searchMemory(true);});
+let filterTimer=0;
+$('logFilter').addEventListener('input',()=>{
+  clearTimeout(filterTimer);
+  filterTimer=setTimeout(()=>{
+    state.logQuery=$('logFilter').value.trim();
+    updateUrl(false);loadLogs();
+  },220);
+});
+$('syncLogs').addEventListener('click',syncRawLogs);
+$('copyLogText').addEventListener('click',()=>copyText(state.logText||'','LOG COPIED'));
+$('copyArchivePath').addEventListener('click',()=>copyText((state.logStats||{}).archive_root||'','ARCHIVE PATH COPIED'));
+$('searchThisLog').addEventListener('click',()=>{
+  const current=state.logs.find(item=>item.id===state.selectedLog);
+  state.searchQuery=current?current.topic:($('logTitle').textContent||'');
+  $('searchQuery').value=state.searchQuery;
+  switchView('search',true);
+  searchMemory(false);
+});
+window.addEventListener('resize',resizeFlux);
+window.addEventListener('popstate',applyLocation);
+window.addEventListener('message',event=>{
+  if(event.origin!==location.origin)return;
+  const data=event.data||{};
+  if(data.type==='memory-kit-view'&&['search','archive','flux'].includes(data.view)){
+    switchView(data.view,true);
+  }
+});
+
+function applyLocation(){
+  const params=new URLSearchParams(location.search);
+  const requested=params.get('view');
+  state.view=['archive','flux'].includes(requested)?requested:'search';
+  state.searchQuery=params.get('q')||'';
+  state.searchMode=params.get('mode')||'hybrid';
+  state.logQuery=params.get('logs_q')||'';
+  state.selectedLog=params.get('log')||'';
+  $('landingQuery').value=state.searchQuery;
+  $('searchQuery').value=state.searchQuery;
+  $('searchMode').value=state.searchMode;
+  $('logFilter').value=state.logQuery;
+  showView(state.view);
+  if(state.view==='archive'){
+    loadLogs().then(()=>{if(state.selectedLog)loadLogDetail(state.selectedLog);});
+  }else if(state.view==='flux'){
+    // The iframe owns the HALOFLUX renderer and reads the same APIs directly.
+  }else if(state.searchQuery){
+    showSearchApp(true);searchMemory(false);
+  }else{
+    showSearchApp(false);
+  }
+}
+
+async function init(){
+  resizeFlux();
+  startFlux();
+  await loadOverview();
+  applyLocation();
+}
+init().catch(error=>{
+  $('tagline').textContent='INITIALIZATION FAILED';
+  console.error(error);
+});
+</script>
+</body>
+</html>
