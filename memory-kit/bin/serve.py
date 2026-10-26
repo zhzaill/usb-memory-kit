@@ -12,6 +12,7 @@ import json
 import mimetypes
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -447,7 +448,21 @@ class H(BaseHTTPRequestHandler):
             self._error(exc)
 
 
+class _V6Server(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
 if __name__ == '__main__':
     port = int((INDEX.cfg.get('search', {}) or {}).get('port', 18200))
+    # Loopback only, but on both families: some browsers resolve "localhost" to ::1 first and
+    # an IPv4-only listener makes the page look unreachable even though 127.0.0.1 works.
     print('memory-kit serving on http://127.0.0.1:%d  (Ctrl+C 停止)' % port)
-    ThreadingHTTPServer(('127.0.0.1', port), H).serve_forever()
+    server = ThreadingHTTPServer(('127.0.0.1', port), H)
+    try:
+        v6 = _V6Server(('::1', port), H)
+        import threading
+        threading.Thread(target=v6.serve_forever, daemon=True).start()
+        print('also listening on http://[::1]:%d  (localhost)' % port)
+    except OSError as exc:
+        print('ipv6 loopback not bound: %s' % exc)
+    server.serve_forever()

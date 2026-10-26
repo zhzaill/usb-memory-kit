@@ -301,12 +301,48 @@ if(FILE_MODE){
 }
 
 /* Every API call goes through here. A dead server used to make clicks do nothing at all
-   (the fetch rejects, no UI change, no message) which reads exactly like "preview is broken". */
+   (the fetch rejects, no UI change, no message) which reads exactly like "preview is broken".
+
+   Some Chromium-based browsers now enforce "Local Network Access": the page itself loads
+   fine (top-level navigation), yet every fetch()/XHR to 127.0.0.1 is refused, so the shell
+   renders while all data is missing. A same-origin iframe navigation is not a subresource
+   fetch, and a same-origin frame's DOM stays readable — so it can carry the JSON instead.
+   GET goes through the iframe whenever fetch fails; POST still needs fetch. */
+let TRANSPORT=(new URLSearchParams(location.search).get('transport')==='iframe')?'iframe':'fetch';
+function iframeGet(url,timeout=15000){
+  return new Promise(resolve=>{
+    const frame=document.createElement('iframe');
+    frame.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;border:0';
+    let settled=false;
+    const done=value=>{ if(settled)return; settled=true; try{frame.remove()}catch(error){} resolve(value); };
+    frame.onload=()=>{
+      try{
+        const doc=frame.contentDocument;
+        const text=doc&&doc.body?(doc.body.textContent||''):'';
+        done(JSON.parse(text));
+      }catch(error){ done({error:'iframe 通道：'+(error.message||'无法读取响应')}); }
+    };
+    frame.onerror=()=>done({error:'iframe 通道：加载失败'});
+    setTimeout(()=>done({error:'iframe 通道：超时'}),timeout);
+    frame.src=url;
+    document.body.appendChild(frame);
+  });
+}
+function useIframe(reason){
+  if(TRANSPORT==='iframe')return;
+  TRANSPORT='iframe';
+  console.warn('[memory-kit] fetch 被拦截，改用同源 iframe 通道：',reason);
+  if(typeof showToast==='function')showToast('已切换为 iframe 通道（浏览器拦截了本地 fetch）',6000);
+}
 async function apiFetch(url, options){
+  const method=(options&&options.method)?String(options.method).toUpperCase():'GET';
+  const isGet=method==='GET';
+  if(TRANSPORT==='iframe'&&isGet)return await iframeGet(url);
   let response;
   try{
     response=await fetch(url, options);
   }catch(error){
+    if(isGet){ useIframe(error); return await iframeGet(url); }
     reportOffline(error);
     return null;
   }
