@@ -53,11 +53,14 @@ foreach ($root in $entry.Value.roots) {
   foreach ($f in $files) {
     $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
     $key = $tag + '|' + $rel
-    $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+    # A log being written elsewhere (or an Office lock) must not abort the whole run.
+    try { $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash }
+    catch { $busy++; Write-Output ("WARN locked, skipped: {0}" -f $f.FullName); continue }
     if ($known.ContainsKey($key) -and $known[$key].sha256 -eq $sha) { $skipped++; continue }
     $dest = Join-Path $destRoot ((Join-Path $tag $rel))
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-    Copy-Item -LiteralPath $f.FullName -Destination $dest -Force
+    try { Copy-Item -LiteralPath $f.FullName -Destination $dest -Force }
+    catch { $busy++; Write-Output ("WARN copy failed, skipped: {0}" -f $f.FullName); continue }
     $known[$key] = [PSCustomObject]@{
       root = $root; tag = $tag; relpath = $rel; sha256 = $sha
       bytes = $f.Length; mtime_utc = $f.LastWriteTimeUtc.ToString('o')
@@ -79,11 +82,13 @@ foreach ($filePath in @($entry.Value.files)) {
   $fi++
   $rel = $f.Name
   $key = $tag + '|' + $rel
-  $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+  try { $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash }
+  catch { $busy++; Write-Output ("WARN locked, skipped: {0}" -f $f.FullName); continue }
   if ($known.ContainsKey($key) -and $known[$key].sha256 -eq $sha) { $skipped++; continue }
   $dest = Join-Path $destRoot ((Join-Path $tag $rel))
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-  Copy-Item -LiteralPath $f.FullName -Destination $dest -Force
+  try { Copy-Item -LiteralPath $f.FullName -Destination $dest -Force }
+  catch { $busy++; Write-Output ("WARN copy failed, skipped: {0}" -f $f.FullName); continue }
   $known[$key] = [PSCustomObject]@{
     root = $root; tag = $tag; relpath = $rel; sha256 = $sha
     bytes = $f.Length; mtime_utc = $f.LastWriteTimeUtc.ToString('o')
