@@ -696,8 +696,11 @@ async function init(){
     $('logEmpty').textContent='OPEN http://127.0.0.1:18200';
     return;                       // no fetch storm: this origin can never reach the service
   }
-  await loadOverview();
+  // Render the requested view first: waiting on loadOverview() used to leave the landing
+  // page on screen whenever /api/health was slow or refused, even though the view asked
+  // for archive was perfectly reachable.
   applyLocation();
+  await loadOverview();
 }
 init().catch(error=>{
   $('tagline').textContent='INITIALIZATION FAILED';

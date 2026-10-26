@@ -16,6 +16,13 @@ runtime environments, credentials, or user files.
    - `光场`: a data-driven HALOFLUX visualization of the archive and index
 5. Keeps raw files readable even when embedding or clustering is unavailable.
 
+## Opening the interface (browser compatibility)
+
+Some Chromium forks (Tabbit 1.18 and newer) enforce Local Network Access: the page
+loads but every `fetch()` to the loopback address is refused. The stick therefore
+ships a **portable Firefox** in `browser/` — start it with
+`browser\启动记忆浏览器.cmd`, which starts the service if needed and then opens the
+kit page with its own profile (no install, no LNA gating, logins travel with it).
 ## Quick start
 
 Requirements:
