@@ -42,6 +42,13 @@ shell but the browser refuses every API request it makes, so the media list stay
 empty and previews report "Failed to fetch". The page detects that origin and
 shows a banner with the correct address.
 
+If a browser enforces Local Network Access (for example Tabbit 1.18), the page
+still loads but every `fetch()` to the loopback address is refused. The front
+end detects that and retries GET requests through a same-origin hidden iframe,
+whose DOM stays readable; append `?transport=iframe` to force that path.
+`http://localhost:18200` and `http://[::1]:18200` work as well, because
+`serve.py` binds both loopback families.
+
 The front end also surfaces a dead service instead of staying silent: a failed
 request writes the reason into the content pane and toasts it.
 
