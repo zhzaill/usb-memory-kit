@@ -42,15 +42,22 @@ function Get-Health([int]$port) {
 
 # ---------------- stop ----------------
 if ($Stop) {
+  # Trust the recorded pids AND the process table: a server started by another entry point
+  # (e.g. memory-kit\start.ps1) may be missing from pids.json. Match on this stick's path.
+  $targets = New-Object System.Collections.ArrayList
   if (Test-Path $pidFile) {
-    $pids = Get-Content $pidFile -Raw | ConvertFrom-Json
-    foreach ($p in $pids) {
-      $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
-      if ($proc) { Write-Output ("stopping pid {0} ({1})" -f $p, $proc.ProcessName); Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
-    }
-    Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
-    Write-Output 'local-ai stopped'
-  } else { Write-Output 'no state\pids.json -> nothing recorded as running' }
+    try { foreach ($p in (Get-Content $pidFile -Raw | ConvertFrom-Json)) { if ($p) { [void]$targets.Add([int]$p) } } } catch {}
+  }
+  Get-CimInstance Win32_Process -Filter "Name='llama-server.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -and $_.CommandLine.Contains($root) } |
+    ForEach-Object { if (-not $targets.Contains([int]$_.ProcessId)) { [void]$targets.Add([int]$_.ProcessId) } }
+  if ($targets.Count -eq 0) { Write-Output 'nothing running on this stick' }
+  foreach ($p in $targets) {
+    $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
+    if ($proc) { Write-Output ("stopping pid {0} ({1})" -f $p, $proc.ProcessName); Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
+  }
+  Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+  if ($targets.Count -gt 0) { Write-Output 'local-ai stopped' }
   return
 }
 

@@ -286,6 +286,58 @@ const fmtBytes=n=>{
   return (n/1024/1024).toFixed(1)+' MB';
 };
 const nowUrl=()=>new URL(location.href);
+
+/* Opened by double-click, the file lives at file:///…/web/index.html and every API call is
+   refused by the browser (file origin + Chromium's local-network policy) -> "Failed to fetch".
+   Say so on the spot instead of leaving an empty shell behind. */
+const FILE_MODE=location.protocol==='file:';
+if(FILE_MODE){
+  document.body.insertAdjacentHTML('afterbegin',
+    '<div style="position:sticky;top:0;z-index:99;padding:10px 16px;background:#fff8c5;color:#1f2328;'
+    +'border-bottom:1px solid #d1d9e0;font:13px/1.6 ui-monospace,Consolas,monospace">'
+    +'<b>本地文件模式（file://）</b> —— 浏览器不允许这个页面访问记忆服务，所以列表与预览都是空的。<br>'
+    +'请打开服务地址：<a href="http://127.0.0.1:18200/" style="color:#0969da">http://127.0.0.1:18200/</a>'
+    +' &nbsp;（服务没起时，先双击 U 盘根目录的「启动检索.cmd」）</div>');
+}
+
+/* Every API call goes through here. A dead server used to make clicks do nothing at all
+   (the fetch rejects, no UI change, no message) which reads exactly like "preview is broken". */
+async function apiFetch(url, options){
+  let response;
+  try{
+    response=await fetch(url, options);
+  }catch(error){
+    reportOffline(error);
+    return null;
+  }
+  if(!response.ok){
+    let detail='';
+    try{ detail=(await response.clone().json()).error||''; }catch(error){}
+    reportOffline(new Error('HTTP '+response.status+(detail?' · '+detail:'')));
+    return null;
+  }
+  try{
+    return await response.json();
+  }catch(error){
+    reportOffline(new Error('响应不是合法 JSON'));
+    return null;
+  }
+}
+function reportOffline(error){
+  const message='连接记忆服务失败：'+error.message
+    +' —— 确认 启动检索.cmd 的窗口没有关掉，然后刷新本页。';
+  if(typeof showToast==='function')showToast(message,9000);
+  const meta=$('resultMeta');if(meta)meta.textContent=message;
+  const viewer=$('logViewer');
+  if(viewer&&!viewer.hidden){
+    $('logTitle').textContent='SERVICE OFFLINE';
+    $('logMeta').textContent='';
+    $('logText').textContent=message;
+  }
+  const empty=$('logEmpty');
+  if(empty&&!empty.hidden)empty.textContent='SERVICE OFFLINE';
+  console.error('[memory-kit]',error);
+}
 function updateUrl(push){
   const u=nowUrl();
   u.searchParams.set('view',state.view);
@@ -323,11 +375,12 @@ function switchView(view,push=true){
 
 async function loadOverview(){
   const [health,clusterData]=await Promise.all([
-    fetch('/api/health').then(r=>r.json()),
-    fetch('/api/clusters').then(r=>r.json())
+    apiFetch('/api/health'),
+    apiFetch('/api/clusters')
   ]);
+  if(!health)return;
   state.health=health;
-  state.clusters=clusterData.clusters||[];
+  state.clusters=(clusterData&&clusterData.clusters)||[];
   $('tagline').textContent=`随身日志记忆库 · ${health.chunks} 块 · ${health.vectors} 向量 · ${state.clusters.length} 社区`;
   const chips=$('topicChips');
   chips.innerHTML='';
@@ -375,8 +428,8 @@ async function searchMemory(push){
   showSearchApp(true);
   if(push)updateUrl(true);
   const started=performance.now();
-  const response=await fetch('/api/search?q='+encodeURIComponent(q)+'&mode='+encodeURIComponent(state.searchMode)+'&k=10');
-  const data=await response.json();
+  const data=await apiFetch('/api/search?q='+encodeURIComponent(q)+'&mode='+encodeURIComponent(state.searchMode)+'&k=10');
+  if(!data)return;
   const elapsed=(performance.now()-started).toFixed(0);
   $('resultMeta').textContent=`${data.results.length?data.results.length+' 条结果':'无结果'} · ${elapsed} ms · mode=${state.searchMode}${data.degraded?' · sparse fallback':' · endpoint ok'}`;
   const warning=data.degraded?'<div class="search-warning" role="alert">embedding 端点不可用，本次为纯关键词检索</div>':'';
@@ -394,8 +447,8 @@ $('resultList').addEventListener('click',async event=>{
   const id=link.dataset.id;
   const old=document.getElementById('full-'+id);
   if(old){old.remove();return;}
-  const data=await fetch('/api/chunk?id='+encodeURIComponent(id)).then(r=>r.json());
-  if(data.error)return;
+  const data=await apiFetch('/api/chunk?id='+encodeURIComponent(id));
+  if(!data||data.error)return;
   const div=document.createElement('div');div.className='result-full';div.id='full-'+id;
   div.innerHTML=`<div class="fh">${esc((data.headings||[]).join(' > '))}</div><pre></pre>`;
   div.querySelector('pre').textContent=data.text;
@@ -420,7 +473,8 @@ function renderLogs(){
   });
 }
 async function loadLogs(){
-  const data=await fetch('/api/logs?q='+encodeURIComponent(state.logQuery)+'&limit=1000').then(r=>r.json());
+  const data=await apiFetch('/api/logs?q='+encodeURIComponent(state.logQuery)+'&limit=1000');
+  if(!data)return;
   state.logs=data.files||[];
   state.logStats=data.stats||{};
   $('logStats').textContent=`${state.logStats.files||0} FILES · ${fmtBytes(state.logStats.bytes||0)}`;
@@ -440,8 +494,12 @@ async function loadLogDetail(id){
   $('logTitle').textContent='LOADING';
   $('logMeta').textContent=id;
   $('logText').textContent='';
-  const data=await fetch('/api/log?id='+encodeURIComponent(id)).then(r=>r.json());
-  if(data.error){showToast(data.error);return;}
+  const data=await apiFetch('/api/log?id='+encodeURIComponent(id));
+  if(!data){                     // reportOffline already put the reason into the pane
+    $('logTitle').textContent='LOAD FAILED';
+    return;
+  }
+  if(data.error){showToast(data.error);$('logTitle').textContent='LOAD FAILED';return;}
   state.logText=data.text||'';
   $('logTitle').textContent=data.topic||data.name;
   $('logMeta').textContent=`${data.date||'undated'} · ${fmtBytes(data.bytes)} · ${data.id}`;
@@ -459,10 +517,10 @@ async function syncRawLogs(){
   const button=$('syncLogs');
   button.disabled=true;$('syncStatus').textContent='SYNCING';
   try{
-    const response=await fetch('/api/logs/sync',{
+    const data=await apiFetch('/api/logs/sync',{
       method:'POST',headers:{'Content-Type':'application/json'},body:'{}'
     });
-    const data=await response.json();
+    if(!data){$('syncStatus').textContent='FAILED';return;}
     $('syncStatus').textContent=data.success?'SYNCED':'FAILED';
     showToast(data.output||(data.success?'synchronized':'sync failed'),6000);
     await loadLogs();
@@ -597,6 +655,11 @@ function applyLocation(){
 async function init(){
   resizeFlux();
   startFlux();
+  if(FILE_MODE){
+    $('tagline').textContent='本地文件模式 · 请访问 http://127.0.0.1:18200';
+    $('logEmpty').textContent='OPEN http://127.0.0.1:18200';
+    return;                       // no fetch storm: this origin can never reach the service
+  }
   await loadOverview();
   applyLocation();
 }

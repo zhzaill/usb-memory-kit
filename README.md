@@ -34,6 +34,17 @@ Using the stick:
 The first run creates the runtime environment on the stick. The service binds to
 `127.0.0.1` and is intended for local, single-user use.
 
+## Opening the interface
+
+Always open the service address <http://127.0.0.1:18200>. Do **not** open
+`memory-kit/web/index.html` by double-clicking it: a `file://` page renders the
+shell but the browser refuses every API request it makes, so the media list stays
+empty and previews report "Failed to fetch". The page detects that origin and
+shows a banner with the correct address.
+
+The front end also surfaces a dead service instead of staying silent: a failed
+request writes the reason into the content pane and toasts it.
+
 ## Layout
 
 ```text
