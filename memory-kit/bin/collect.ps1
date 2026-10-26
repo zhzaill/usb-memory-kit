@@ -45,7 +45,7 @@ if (Test-Path $manifestPath) {
   foreach ($m in (Get-Content $manifestPath -Raw | ConvertFrom-Json)) { $known[($m.tag + '|' + $m.relpath)] = $m }
 }
 
-$ri = 0; $copied = 0; $skipped = 0
+$ri = 0; $copied = 0; $skipped = 0; $busy = 0
 foreach ($root in $entry.Value.roots) {
   if (-not (Test-Path $root)) { Write-Output ("WARN root not found: {0}" -f $root); continue }
   $tag = 'r' + $ri; $ri++
@@ -93,5 +93,5 @@ foreach ($filePath in @($entry.Value.files)) {
 $out = @($known.Values | Sort-Object tag, relpath)
 $json = if ($out.Count -eq 1) { ConvertTo-Json $out[0] } else { ConvertTo-Json $out }
 [IO.File]::WriteAllText($manifestPath, $json, (New-Object System.Text.UTF8Encoding($false)))
-Write-Output ("machine={0} copied={1} skipped={2} manifest_entries={3}" -f $machine, $copied, $skipped, $out.Count)
+Write-Output ("machine={0} copied={1} skipped={2} busy={3} manifest_entries={4}" -f $machine, $copied, $skipped, $busy, $out.Count)
 Write-Output ("manifest -> {0}" -f $manifestPath)
