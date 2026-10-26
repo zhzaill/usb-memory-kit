@@ -8,8 +8,9 @@
 | `LICENSE` | MIT license for this layout |
 | `CREDITS.md` | Attribution and upstream projects |
 | `SECURITY.md` | Data and credential boundary |
+| `控制台.cmd` / `console.ps1` | Terminal-style operation menu with sync, status and archive shortcuts |
 | `吸收日志.cmd` | Copy and index logs from the current machine |
-| `启动检索.cmd` | Start the local memory-kit service |
+| `启动检索.cmd` | One-click: start the service if needed and open portable Firefox |
 | `启动本地AI.cmd` | Start optional local llama.cpp endpoints |
 | `我的文件/` | User-controlled files; never committed |
 

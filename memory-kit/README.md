@@ -23,10 +23,16 @@ discover roots → SHA256 archive → chunk → embed → cluster
 From the USB root:
 
 ```text
+控制台.cmd     terminal-style field console: status, sync, archive and launch
 吸收日志.cmd   discover + collect + index logs from this machine
-启动检索.cmd   start the local web application
+启动检索.cmd   start the local web application in portable Firefox
 启动本地AI.cmd start optional llama.cpp chat/embedding servers
 ```
+
+The copied source logs live under `corpus/<COMPUTERNAME>/`. The generated files are
+`index/chunks.jsonl` (text chunks), `index/vectors.jsonl` (embeddings) and
+`index/organization.json` (communities). A successful full run prints and checks
+that vector count equals chunk count before rebuilding communities.
 
 Manual equivalent:
 
@@ -52,6 +58,23 @@ the URL and browser history.
 - `config/secret.ps1`: optional local tunnel credentials, never committed.
 
 `start.ps1` generates `mcp/memory-kit.resolved.json` for the current drive letter.
+
+### Project anchors
+
+Stable rule or architecture documents can be registered as named roots in the current
+machine entry. Anchors collect Markdown only and appear in result sources with an
+`anchor-<id>` tag and explicit anchor metadata, separate from chronological work logs:
+
+```json
+{
+  "id": "workspace-rules",
+  "anchor": true,
+  "path": "C:\\Projects\\ai-workspace-rules"
+}
+```
+
+Use a narrow documentation directory when possible; do not point an anchor at a whole
+repository containing source code, dependencies or generated output.
 
 ## Embedding chain
 

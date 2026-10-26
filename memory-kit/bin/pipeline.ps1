@@ -40,7 +40,10 @@ $registeredFiles = @()
 $cfg = Get-Content $cfgFile -Raw | ConvertFrom-Json
 $entry = $cfg.PSObject.Properties[$me]
 if ($entry) {
-  foreach ($r in $entry.Value.roots) { if (Test-Path -LiteralPath $r) { $registeredRoots += $r } }
+  foreach ($r in $entry.Value.roots) {
+    $rootPath = if ($r -is [string]) { $r } else { $r.path }
+    if ($rootPath -and (Test-Path -LiteralPath $rootPath)) { $registeredRoots += $r }
+  }
   foreach ($f in @($entry.Value.files)) {
     if ($f -and (Test-Path -LiteralPath $f -PathType Leaf)) { $registeredFiles += $f }
   }
@@ -61,7 +64,8 @@ if ($Roots -and $Roots.Count -gt 0) {
   }
 } elseif ($registeredRoots.Count -gt 0) {
   $use = $registeredRoots
-  Say ("  registered roots: {0}" -f ($use -join ', '))
+  $rootLabels = @($use | ForEach-Object { if ($_ -is [string]) { $_ } else { "{0}={1}" -f $_.id, $_.path } })
+  Say ("  registered roots: {0}" -f ($rootLabels -join ', '))
   if ($registeredFiles.Count -gt 0) {
     Say ("  registered extra files: {0}" -f $registeredFiles.Count)
   }
@@ -136,7 +140,9 @@ else {
 # ---------------- 3. collect ----------------
 Step 3 'collect (archive new/changed log files into corpus\)'
 $colOut = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $bin 'collect.ps1')
+$collectExit = $LASTEXITCODE
 $colOut | ForEach-Object { Say ("  " + $_) }
+if ($collectExit -ne 0) { throw ("collect.ps1 failed with exit code {0}" -f $collectExit) }
 $copied = 0
 foreach ($line in $colOut) { if ($line -match 'copied=(\d+)') { $copied = [int]$Matches[1] } }
 
@@ -152,17 +158,28 @@ $env:TEMP = $tmpDir
 
 Step 4 'chunk'
 $chunkOut = & $py (Join-Path $bin 'chunk.py')
+$chunkExit = $LASTEXITCODE
 $chunkOut | ForEach-Object { Say ("  " + $_) }
+if ($chunkExit -ne 0) { throw ("chunk.py failed with exit code {0}" -f $chunkExit) }
 $chunks = 0
 foreach ($line in $chunkOut) { if ($line -match 'chunks=(\d+)') { $chunks = [int]$Matches[1] } }
 
 Step 5 'embed + organize'
 if ($live -or -not $Sparse) {
   $embOut = & $py (Join-Path $bin 'embed.py')
+  $embedExit = $LASTEXITCODE
   $embOut | ForEach-Object { Say ("  " + $_) }
+  if ($embedExit -ne 0) { throw ("embed.py failed with exit code {0}" -f $embedExit) }
+}
+if (-not $Sparse) {
+  $check = & $py (Join-Path $bin 'index_status.py') --strict | ConvertFrom-Json
+  if ($LASTEXITCODE -ne 0) { throw ("vector ID coverage check failed: {0}" -f ($check | ConvertTo-Json -Compress)) }
+  Say ("  coverage check : {0}/{1} chunks; missing={2}, duplicates={3}" -f $check.vectors, $check.chunks, $check.missing, $check.duplicate_vectors)
 }
 $orgOut = & $py (Join-Path $bin 'organize.py')
+$organizeExit = $LASTEXITCODE
 $orgOut | ForEach-Object { Say ("  " + $_) }
+if ($organizeExit -ne 0) { throw ("organize.py failed with exit code {0}" -f $organizeExit) }
 
 # ---------------- summary ----------------
 $el = (Get-Date) - $t0
@@ -176,11 +193,16 @@ if (Test-Path $cpath) { $nc = (Get-Content $cpath | Measure-Object -Line).Lines 
 Say ''
 Say '================ absorb summary ================'
 Say ("  machine        : {0}" -f $me)
-Say ("  roots          : {0}" -f ($use -join ' ; '))
+$summaryRoots = @($use | ForEach-Object { if ($_ -is [string]) { $_ } else { "{0}={1}" -f $_.id, $_.path } })
+Say ("  roots          : {0}" -f ($summaryRoots -join ' ; '))
 Say ("  extra files    : {0}" -f $registeredFiles.Count)
 Say ("  new files      : {0}" -f $copied)
 Say ("  chunks (total) : {0}" -f $nc)
 Say ("  vectors (total): {0}" -f $nv)
+if (-not $Sparse -and $nc -ne $nv) { throw ("vector coverage check failed: chunks={0}, vectors={1}" -f $nc, $nv) }
+Say ("  archive        : {0}" -f (Join-Path (Join-Path $kit 'corpus') $me))
+Say ("  chunk index    : {0}" -f (Join-Path $kit 'index\chunks.jsonl'))
+Say ("  vector index   : {0}" -f (Join-Path $kit 'index\vectors.jsonl'))
 Say ("  elapsed        : {0:N1}s" -f $el.TotalSeconds)
 Say '================================================'
 Say ''

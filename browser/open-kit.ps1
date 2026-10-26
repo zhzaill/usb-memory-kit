@@ -1,10 +1,12 @@
 # browser :: open-kit.ps1  (ASCII only, PowerShell 5.1)
 # Start the memory-kit service if it is not already answering, then open the on-stick
 # Firefox (own profile, no install, no Local Network Access gating) at the kit page.
+param([string]$View = '')
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $usb  = Split-Path -Parent $here
 $url  = 'http://127.0.0.1:18200/'
+if ($View) { $url += '?view=' + [Uri]::EscapeDataString($View) }
 
 function Test-Kit {
   try { (Invoke-WebRequest -Uri ($url + 'api/health') -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200 }

@@ -46,10 +46,18 @@ if (Test-Path $manifestPath) {
 }
 
 $ri = 0; $copied = 0; $skipped = 0; $busy = 0
-foreach ($root in $entry.Value.roots) {
+foreach ($rootEntry in $entry.Value.roots) {
+  $anchorId = $null
+  if ($rootEntry -is [string]) { $root = $rootEntry }
+  else {
+    $root = [string]$rootEntry.path
+    if ($rootEntry.anchor) { $anchorId = [string]$rootEntry.id }
+  }
   if (-not (Test-Path $root)) { Write-Output ("WARN root not found: {0}" -f $root); continue }
-  $tag = 'r' + $ri; $ri++
-  $files = Get-ChildItem -LiteralPath $root -Recurse -File -Include *.md,*.log,*.csv,*.txt -ErrorAction SilentlyContinue
+  if ($anchorId) { $tag = 'anchor-' + ($anchorId -replace '[^A-Za-z0-9_-]', '-') }
+  else { $tag = 'r' + $ri; $ri++ }
+  if ($anchorId) { $files = Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue }
+  else { $files = Get-ChildItem -LiteralPath $root -Recurse -File -Include *.md,*.log,*.csv,*.txt -ErrorAction SilentlyContinue }
   foreach ($f in $files) {
     $rel = $f.FullName.Substring($root.Length).TrimStart('\', '/')
     $key = $tag + '|' + $rel

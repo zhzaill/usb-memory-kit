@@ -115,8 +115,5 @@ $resolved = @{
 
 # ---------- 3. serve ----------
 $port = $cfg.search.port
-# auto-open browser once the interface is up (index load takes a few seconds)
-Start-Process powershell -WindowStyle Hidden -ArgumentList @(
-  '-NoProfile','-Command',("Start-Sleep 8; Start-Process 'http://127.0.0.1:{0}/'" -f $port))
 Write-Output ("memory-kit -> http://127.0.0.1:{0}   (close this window to stop)" -f $port)
 & $py (Join-Path $kit 'bin\serve.py')

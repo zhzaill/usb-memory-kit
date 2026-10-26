@@ -6,7 +6,7 @@ import unittest
 BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'bin')
 sys.path.insert(0, BIN)
 
-from chunk import file_meta, read_text  # noqa: E402
+from chunk import anchor_id, file_meta, read_text  # noqa: E402
 
 
 class ChunkMetadataTests(unittest.TestCase):
@@ -26,6 +26,10 @@ class ChunkMetadataTests(unittest.TestCase):
             with open(path, 'wb') as handle:
                 handle.write('中文日志'.encode('gb18030'))
             self.assertEqual(read_text(path), '中文日志')
+
+    def test_named_anchor_is_not_a_dated_log(self):
+        self.assertEqual(anchor_id('LAPTOP/anchor-ai-workspace-rules/docs/quickstart.md'), 'ai-workspace-rules')
+        self.assertIsNone(anchor_id('LAPTOP/r0/2026-10-26-note.md'))
 
 
 if __name__ == '__main__':

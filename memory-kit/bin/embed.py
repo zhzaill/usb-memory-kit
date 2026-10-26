@@ -29,10 +29,24 @@ def pick_endpoint():
 
 
 def embed_texts(ep, texts):
-    r = requests.post(ep['url'], json={'input': texts, 'model': ep.get('model', '')}, timeout=120)
+    r = requests.post(ep['url'], json={'input': texts, 'model': ep.get('model', '')}, timeout=180)
     r.raise_for_status()
-    data = sorted(r.json()['data'], key=lambda d: d.get('index', 0))
-    return [d['embedding'] for d in data]
+    try:
+        data = sorted(r.json()['data'], key=lambda d: d.get('index', 0))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError('embedding response has no usable data array') from exc
+    if len(data) != len(texts):
+        raise RuntimeError('embedding response count mismatch: requested %d, received %d' % (len(texts), len(data)))
+    vectors = []
+    expected_dim = int(CFG.get('dim', 0))
+    for pos, item in enumerate(data):
+        vector = item.get('embedding') if isinstance(item, dict) else None
+        if not isinstance(vector, list) or not vector:
+            raise RuntimeError('embedding response item %d has no vector' % pos)
+        if expected_dim and len(vector) != expected_dim:
+            raise RuntimeError('embedding dimension mismatch: expected %d, received %d' % (expected_dim, len(vector)))
+        vectors.append(vector)
+    return vectors
 
 
 def main():
@@ -47,7 +61,9 @@ def main():
         for l in open(vec_path, encoding='utf-8'):
             if l.strip():
                 rec = json.loads(l)
-                old[rec['id']] = rec['vector']
+                vector = rec.get('vector')
+                if isinstance(vector, list) and vector and (not CFG.get('dim') or len(vector) == int(CFG['dim'])):
+                    old[rec['id']] = vector
 
     todo = [c for c in chunks if c['id'] not in old]
     print('chunks=%d cached=%d todo=%d' % (len(chunks), len(chunks) - len(todo), len(todo)))
@@ -64,23 +80,30 @@ def main():
     t0 = time.time()
     done = 0
     tmp = vec_path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
-        # 先写新算的
-        for i in range(0, len(todo), batch):
-            part = todo[i:i + batch]
-            vecs = embed_texts(ep, [c['embed_text'] for c in part])
-            for c, v in zip(part, vecs):
-                f.write(json.dumps({'id': c['id'], 'vector': v}, ensure_ascii=False) + '\n')
-            done += len(part)
-            if done % (batch * 10) == 0 or done == len(todo):
-                el = time.time() - t0
-                print('embedded %d/%d  %.1fs  %.1f chunks/s' % (done, len(todo), el, done / max(el, 0.001)))
-        # 再写仍然被引用的旧向量（清理孤儿）
-        cur_ids = {c['id'] for c in chunks}
-        for vid, v in old.items():
-            if vid in cur_ids:
-                f.write(json.dumps({'id': vid, 'vector': v}, ensure_ascii=False) + '\n')
-    os.replace(tmp, vec_path)
+    try:
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
+            # 先写新算的；任何批次不完整或维度错误都会在替换正式文件前中止。
+            for i in range(0, len(todo), batch):
+                part = todo[i:i + batch]
+                vecs = embed_texts(ep, [c['embed_text'] for c in part])
+                for c, v in zip(part, vecs):
+                    f.write(json.dumps({'id': c['id'], 'vector': v}, ensure_ascii=False) + '\n')
+                done += len(part)
+                if done % (batch * 10) == 0 or done == len(todo):
+                    el = time.time() - t0
+                    print('embedded %d/%d  %.1fs  %.1f chunks/s' % (done, len(todo), el, done / max(el, 0.001)))
+            # 再写仍然被引用的旧向量（清理孤儿）
+            cur_ids = {c['id'] for c in chunks}
+            for vid, v in old.items():
+                if vid in cur_ids:
+                    f.write(json.dumps({'id': vid, 'vector': v}, ensure_ascii=False) + '\n')
+        os.replace(tmp, vec_path)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
     print('-> %s  total_vectors=%d  elapsed=%.1fs' % (vec_path, len(cur_ids), time.time() - t0))
 
 

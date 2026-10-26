@@ -176,6 +176,7 @@ class KitIndex:
                 'date': m['date'],
                 'machines': m['machines'],
                 'source': m['source'],
+                'anchor': m.get('anchor'),
                 'headings': m['headings'],
                 'preview': m['text'][:200],
                 'chars': m['chars'],

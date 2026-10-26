@@ -34,12 +34,18 @@ Requirements:
 Using the stick:
 
 1. Copy this repository to the root of an NTFS USB drive.
-2. Double-click `吸收日志.cmd` to discover and archive logs from the current machine.
-3. Double-click `启动检索.cmd`.
-4. Open <http://127.0.0.1:18200>.
+2. Double-click `控制台.cmd` to see source roots, archive location, vector coverage and
+   available local operations. Choose `[1]` to sync, vectorize and organize.
+3. Or double-click `吸收日志.cmd` to run the full pipeline directly. Source files are
+   copied into `memory-kit/corpus/<COMPUTERNAME>/`; derived chunks and vectors live in
+   `memory-kit/index/`.
+4. Double-click `启动检索.cmd` once. It starts the service if needed and opens the
+   bundled Firefox directly to the memory library.
 
 The first run creates the runtime environment on the stick. The service binds to
-`127.0.0.1` and is intended for local, single-user use.
+`127.0.0.1` and is intended for local, single-user use. Keep `browser/firefox/` and
+`browser/profile/` beside the launcher on the stick; those local portable files are
+excluded from this repository.
 
 ## Opening the interface
 
@@ -94,6 +100,11 @@ See [USB-LAYOUT.md](USB-LAYOUT.md) for the complete responsibility map.
 - `memory-kit/config/kit.json`: embedding endpoints, chunking and clustering.
 - `memory-kit/config/categories.json`: file-organizer categories.
 - `memory-kit/config/secret.ps1`: never committed; optional tunnel credentials.
+
+Stable rule and architecture documents can be added as named `anchor` roots in the
+local machine entry. Anchors collect Markdown only; the archive and search results keep
+their `anchor-<id>` label and explicit anchor metadata separate from ordinary dated logs.
+Prefer a narrow documentation folder over a whole code repository.
 
 The first `pipeline.ps1` run can discover log roots and register the current machine.
 Use `-Roots` to provide roots explicitly.

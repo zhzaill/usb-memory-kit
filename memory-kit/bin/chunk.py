@@ -68,6 +68,11 @@ def file_meta(path):
         return None, stem
 
 
+def anchor_id(source_key):
+    parts = source_key.split('/', 2)
+    return parts[1][7:] if len(parts) > 2 and parts[1].startswith('anchor-') else None
+
+
 def split_blocks(text):
     """按代码围栏外的标题切段。返回 [(标题路径list, 段落文本)]，保持顺序。"""
     out, buf, cur_path, in_code = [], [], [], False
@@ -160,6 +165,10 @@ def main():
                         seen_sha[sha] = True
                     n_files += 1
                     src_key = machine + '/' + tag + '/' + rel.replace('\\', '/')
+                    anchor = anchor_id(src_key)
+                    if anchor:
+                        date = None
+                        topic = anchor + ' / ' + topic
                     if not first:
                         # 同内容已入块：只给已有记录追加 machine 来源
                         for r in records:
@@ -175,6 +184,7 @@ def main():
                             'content_sha': sha,
                             'machines': [machine],
                             'source': src_key,
+                            'anchor': anchor,
                             'topic': topic,
                             'date': date,
                             'headings': headings,
